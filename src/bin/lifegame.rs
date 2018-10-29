@@ -21,7 +21,7 @@ fn main() {
     stage.set_data(&2, &2, &true);
 
     // 初期状態を画像として書き出す（例：lifegame_0.png）
-    println!("{:?}", stage);
+    println!("{}", stage.to_string());
 
     // 生存時間の間だけwhileループ
     for t in 1 .. TIME+1 {
@@ -31,7 +31,7 @@ fn main() {
         stage = stage.calc_stage(nbh_rule, calc_rule);
 
         // 保持状態を画像として書き出す
-        println!("{:?}", stage);
+        println!("{}", stage.to_string());
     }
 
     // 画像をGifに変換

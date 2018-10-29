@@ -1,11 +1,24 @@
 use std::clone::Clone;
+use std::fmt;
 /// ライフゲームのステージの状態を保持する構造体。
 /// 今は生存データも保持しているがゆくゆくはステージ状態、生態状態を別で保持する
 #[derive(Clone, Debug, PartialEq)]
-pub struct Stage<T: Clone + Copy> {
+pub struct Stage<T> {
     stage: Vec<T>,
     sizes: (usize, usize),  // height, width
     d_state: T
+}
+impl<T: fmt::Display + Clone + Copy + PartialEq> fmt::Display for Stage<T>{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (h, w) = (*self).get_sizes();
+        let mut s: String = "".to_string();
+        for (i, j, t) in (*self).iterate() {
+            if j==0{s += "\n";}
+            s += &format!("{}", *t);
+            if j!=w-1{s += " ";}
+        }
+        write!(f, "{}\n", s)
+    }
 }
 
 impl<T: Clone + Copy + PartialEq>Stage<T> {
