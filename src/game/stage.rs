@@ -8,10 +8,13 @@ pub struct Stage<T: Clone + Copy> {
     d_state: T
 }
 
-impl<T: Clone + Copy> Stage<T> {
+impl<T: Clone + Copy + PartialEq>Stage<T> {
     /// ステージ全体のイテレーターの作成
     pub fn iterate(&self) -> impl Iterator<Item=(usize, usize, &T)> {
-       return  (0 .. (*self).sizes.0 * (*self).sizes.1).map(move |l| (l / (*self).sizes.1, l % (*self).sizes.1, (*self).get_data(l / (*self).sizes.1, l % (*self).sizes.1)));
+       return  (0 .. (*self).sizes.0 * (*self).sizes.1).map(move |l|
+               (l / (*self).sizes.1, 
+                l % (*self).sizes.1, 
+                (*self).get_data(&(l / (*self).sizes.1), &(l % (*self).sizes.1))));
     }
 
     /// 初期ステージ作成関数
@@ -24,7 +27,7 @@ impl<T: Clone + Copy> Stage<T> {
     }
 
     /// ステージ複製関数。後に非公開にするかも。
-    pub fn copy(&self) -> Self {
+    fn copy(&self) -> Self {
         let (w, h) = ((*self).sizes.0, (*self).sizes.1);
         let mut v = vec![(*self).d_state; w * h];
         for i in 0 .. w * h {
@@ -37,33 +40,61 @@ impl<T: Clone + Copy> Stage<T> {
         };
     }
 
+    /// サイズを取得する関数
+    pub fn get_sizes(&self) -> &(usize, usize) {
+        return &(*self).sizes;
+    }
+
+    /// 高さを取得する関数
+    pub fn get_height(&self) -> &usize {
+        return &(*self).sizes.0;
+    }
+
+    /// 横幅を取得する関数
+    pub fn get_width(&self) -> &usize {
+        return &(*self).sizes.1;
+    }
+
     /// 座標からステージの位置を取得
-    fn get_index(&self, i: usize, j: usize) -> usize {
-        return (*self).sizes.1 * i +  j;
+    fn get_index(&self, i: &usize, j: &usize) -> usize {
+         return ((*self).sizes.1 * *i + *j).clone();
     }
 
     /// 指定座標のステージの状態を更新
-    fn set_data(&mut self, i: usize, j: usize, data: T) {
+    pub fn set_data(&mut self, i: &usize, j: &usize, data: &T) {
         let l = (*self).get_index(i, j);
-        (*self).stage[l] = data;
+        (*self).stage[l] = *data;
     }
 
     /// 指定した座標からデータを取得
-    fn get_data(&self, i: usize, j: usize) -> &T {
+    pub fn get_data(&self, i: &usize, j: &usize) -> &T {
         let l = (*self).get_index(i, j);
         return &(*self).stage[l];
     }
 
+    /// 計算規則を与える関数を引数にして新しいステージを計算する関数
+    /// rule :: target_row -> target_col -> target_data -> [(nbh_row, nbh_col)] -> result
+    pub fn calc_stage(&self,
+            nbh_rule: fn(&Stage<T>, usize, usize) -> Vec<(usize, usize)>,
+            calc_rule: fn(&Stage<T>, usize, usize, T, Vec<(usize, usize)>) -> T) -> Self{
+        let mut new_stage = (*self).copy();
+        for (i, j, t) in (*self).iterate() {
+            let indeces = nbh_rule(self, i, j);
+            let new_t = calc_rule(self, i, j, *t, indeces);
+            new_stage.set_data(&i, &j, &new_t);
+        }
+        return new_stage;
+    }
 }
 
 
 #[test]
 fn test_iterater(){
     let mut s = Stage::make_stage(false, 2, 3);
-    s.set_data(0, 2, true);
-    s.set_data(1, 2, true);
+    s.set_data(&0, &2, &true);
+    s.set_data(&1, &2, &true);
     for (i, j, d) in s.iterate(){
-        assert_eq!(s.get_data(i, j), d);
+        assert_eq!(s.get_data(&i, &j), d);
     }
 }
 
@@ -86,7 +117,7 @@ fn test_copy(){
 #[test]
 fn test_set_data(){
     let mut s = Stage::make_stage(false, 2, 3);
-    s.set_data(1, 1, true);
+    s.set_data(&1, &1, &true);
     assert_eq!(s.stage[1], false);
     assert_eq!(s.stage[4], true);
 }
@@ -94,6 +125,28 @@ fn test_set_data(){
 #[test]
 fn test_get_data(){
     let mut s = Stage::make_stage(false, 2, 3);
-    s.set_data(1, 1, true);
-    assert_eq!(s.get_data(1, 1), &true);
+    s.set_data(&1, &1, &true);
+    assert_eq!(s.get_data(&1, &1), &true);
+}
+
+#[test]
+fn test_calc_new_stage() {
+    let mut s = Stage::make_stage(true, 3, 3);
+    s.set_data(&0, &1, &false);
+
+    fn nbh_rule(s: &Stage<bool>, i: usize, j: usize) -> Vec<(usize, usize)>{
+        return vec![((i + 2) % 3, j)];
+    }
+
+    fn calc_rule(s: &Stage<bool>, i:usize, j: usize, t: bool, nbh: Vec<(usize, usize)>) -> bool{
+        let index = nbh[0];
+        let over = (*s).get_data(&index.0, &index.1);
+        return t && *over;
+    }
+
+    s = s.calc_stage(nbh_rule, calc_rule);
+    let mut c = Stage::make_stage(true, 3, 3);
+    c.set_data(&0, &1, &false);
+    c.set_data(&1, &1, &false);
+    assert_eq!(s, c);
 }
